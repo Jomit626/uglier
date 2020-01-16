@@ -1,0 +1,134 @@
+expr : parser_identifier;
+expr : parser_number; 
+expr : parser_string; 
+
+expr : expr < 1 ',' expr;
+
+expr : expr > 2 '=' expr;
+expr : expr > 2 "+=" expr;
+expr : expr > 2 "-=" expr;
+expr : expr > 2 "*=" expr;
+expr : expr > 2 "/=" expr;
+expr : expr > 2 "%=" expr;
+expr : expr > 2 "&=" expr;
+expr : expr > 2 "^=" expr;
+expr : expr > 2 "|=" expr;
+expr : expr > 2 ">>=" expr;
+expr : expr > 2 "<<=" expr;
+ 
+expr : expr '?' expr ':' expr;
+
+expr : expr < 4 "||" expr;
+
+expr : expr < 5 "&&" expr;
+
+expr : expr < 6 "|" expr;
+expr : expr < 7 "^" expr;
+expr : expr < 8 "&" expr;
+
+expr : expr < 9 "==" expr;
+expr : expr < 9 "!=" expr;
+
+expr : expr < 10 '<' expr;
+expr : expr < 10 "<=" expr;
+expr : expr < 10 '>' expr;
+expr : expr < 10 ">=" expr;
+
+expr : expr < 11 ">>" expr;
+expr : expr < 11 "<<" expr;
+
+expr : expr < 12 '+' expr;
+expr : expr < 12 '-' expr;
+
+expr : expr < 13 '*' expr;
+expr : expr < 13 '/' expr;
+expr : expr < 13 '%' expr;
+
+expr : > 14 '!' expr;
+expr : > 14 '~' expr;
+expr : > 14 '-' expr;
+expr : > 14 '&' expr;
+
+expr : "sizeof" expr_brace;
+
+expr : > 14 '*'  expr;
+expr : > 14 "--"  expr;
+expr : > 14 "++"  expr;
+
+expr : expr < 15 "++";
+expr : expr < 15 "--";
+expr : expr < 15 "->" expr;
+expr : expr < 15 "." expr;
+
+expr_sq : '[' expr ']';
+expr : expr expr_sq;
+
+expr_brace : '(' *expr ')';
+expr : expr_brace;
+expr : expr expr_brace;
+
+# actuall ? here
+statement : ?expr ';';
+
+statement : '{' *statement '}';
+
+statement : "if" expr_brace statement ;
+statement : "if" expr_brace statement "else" statement;
+
+statement : "while" expr_brace statement ;
+statement : "while" expr_brace ';';
+
+statement : "do" statement "while" expr_brace ';';
+
+
+for_brace : '(' statement statement ?expr ')';
+statement : "for"  for_brace statement;
+
+# variable declare
+type_decorator : "auto";
+type_decorator : "register";
+type_decorator : "volatile";
+type_decorator : "const";
+type_decorator : "static";
+type_decorator : "extern";
+
+typename : "char";
+typename : "unsigned" "char";
+typename : "short";
+typename : "unsigned" "short";
+typename : "unsigned";
+typename : "int";
+typename : "unsigned" "int";
+typename : "long";
+typename : "unsigned" "long";
+typename : "long" "long";
+typename : "unsigned" "long" "long";
+typename : "float";
+typename : "double";
+typename : "long" "double";
+typename : "void";
+
+variable_declare : *type_decorator < typename expr;
+statement : variable_declare ';' ;
+
+# structure
+# enum_type : "enum" parser_identifier '{' expr '}' ';' ;
+# 
+# typename : "enum" parser_identifier;
+# 
+# struct_type : "struct" parser_identifier statement ;
+# statement : struct_type ';';
+# typename : "struct" parser_identifier;
+# 
+# union_type : "union" parser_identifier '{' expr '}' ;
+# statement : union_type ';';
+# typename : "union" parser_identifier;
+
+type_braced : '(' *variable_declare ')';
+func_declare : variable_declare type_braced ';';
+
+func_define : variable_declare type_braced statement ;
+statement : "return" statement;
+
+# func_define declare without ','
+# no variable_declare in for
