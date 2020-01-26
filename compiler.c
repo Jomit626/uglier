@@ -15,8 +15,8 @@ const int token_string = TOKEN_STRING;
 const int token_char = TOKEN_CONS_CHAR;
 int token_endofline;
 int token_semicolon,token_colon,token_left_asso,token_right_asso,token_left_branket,token_right_branket,token_pound;
-int token_neg,token_star,token_question;
-
+int token_neg,token_star,token_question,token_at;
+hash_table *tab;
 FILE* grammar_file;
 
 void init(){
@@ -34,6 +34,8 @@ void init(){
     token_neg = lex_gen_add_token(14,"-");
     token_star = lex_gen_add_token(15,"*");
     token_question = lex_gen_add_token(16,"?");
+    token_at = lex_gen_add_token(17,"@");
+
     lex_gen_init(2048);
     parse_gen_init();
     target_env = parser_new_env();
@@ -90,20 +92,53 @@ static int search_token_new_to_lex(hash_table* tab,const char* s){
     return tok;
 }
 
+void dump_marco(FILE* f){
+    for(int i=0;i<tab->nbuckets;i++){
+        hash_table_item *item = tab->buckets[i];
+        while (item)
+        {
+            char c = item->key[0];
+            if((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c == '_'))
+                fprintf(f,"#define TOKNE_%s %d \n",item->key,item->value);
+            item = item->next;
+        }
+        
+    }
+}
+
+void gen_file(char *filename){
+    FILE *f = fopen("data.c","w");
+    fprintf (f,"#include <stdint.h>\n");
+    lex_gen_dump(f);
+    parse_gen_dump(f);
+    dump_marco(f);
+    fprintf (f, "void parse(){\n"
+            "\tparse_env* env = parser_new_env();\n"
+            "\tenv->states = (parse_state*)states;\n"
+            "\tenv->edges = (parse_edge*)edges;\n"
+            "\tenv->rules = (parse_rule*)rules;\n"
+            "\tenv->lex_env = lex_new_env((lex_node*)nodes);\n"
+            "\tparser_pase(env);\n"
+            "}\n"
+        );
+}
 
 int main(int argc, char** argv){
+    char* file_name;
     if(argc > 1)
-        debug  = 1;
+        file_name  = argv[1];
+    else
+        file_name = "grammar";
     init();
     lex_init(self_env);
-    grammar_file = fopen("grammar","r");
+    grammar_file = fopen(file_name,"r");
 
     int s = 0;
     int rule_id;
 
     char *word = self_env->word;
 
-    hash_table *tab = target_env->token_map;
+    tab = target_env->token_map;
     char func_buff[50000];
     int func_size = 0;
 
@@ -226,24 +261,26 @@ int main(int argc, char** argv){
                 s = 0;
             } else if(tok == token_left_branket){
                 int cnt = 1;
-                char c = getc(grammar_file);
-                func_size = 1;
+                char c = 0;
+                func_size = 2;
                 func_buff[0] = '{';
+                func_buff[1] = '\n';
                 while(cnt && c != EOF){
+                    c = getc(grammar_file);
                     func_buff[func_size++] = c;
                     putchar(c);
                     if(c == '{') cnt++;
                     if(c == '}') cnt--;
-                    c = getc(grammar_file);
                 }
                 func_buff[func_size++] = '\n';
                 func_buff[func_size++] = 0;
                 parse_gen_rule_set_func(rule_id,SAVESTR(func_buff));
-                s = 0;
             } else if (tok == token_star){
                 mult = 1;
             }else if (tok == token_question){
                 opt = 1;
+            } else if (tok == token_at){
+                parse_gen_rule_set_func(rule_id,(void*)-1);
             }
             break;
         case 3:
@@ -265,16 +302,6 @@ int main(int argc, char** argv){
     //return 1;
     //msg("parse grammar done.\n");
     freopen("test","r",stdin);
-    //FILE *f = fopen("data.c","w");
-    //parse_gen_analyse();
-    //for(int i=0;i<tab->nentities;i++){
-    //    hash_table_item* item = tab->buckets[i];
-    //    while(item){
-    //        printf("%s\n",item->key);
-    //        item = item->next;
-    //    }
-    //}
-    //lex_gen_dump(f);
-    //parse_gen_dump(f);
-    parse(target_env);
+    gen_file("data.c");
+    //parser_pase(target_env);
 }

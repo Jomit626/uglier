@@ -7,9 +7,6 @@
 
 // Graph
 
-#define MAX_RULE_TOKEN 16
-#define MAX_RULE_P 128
-
 #define LEFT_ASSOCIATIVE 1
 #define RIGHT_ASSOCIATIVE 0
 #define DEFAULT_ASSOCIATIVITY 0
@@ -25,27 +22,26 @@ typedef struct parse_edge
 {
     int token;
     int next;
-    int head;
     int tail;
+    int head;
     priority p;
     associativity a;
 } parse_edge;
 
+// remember to rewrite parse_gen.c:parse_gen_dump() after changer this structure
 typedef struct parse_rule
 {
-    int length;
-    int tokens[MAX_RULE_TOKEN];
-    int out_token;
+    int out_token;  
     int end_status;
-    void*(*func)(struct parse_rule*,void*,int);
+    void(*func)(struct parse_rule*,token **,int);
 } parse_rule;
-
-typedef void*(*rule_func)(struct parse_rule*,void*,int);
+// this one too
+typedef void(*rule_func)(struct parse_rule*,token **,int);
 
 typedef struct parse_state
 {
-    int first_edge;
     int out_rule;
+    int first_edge;
 }parse_state;
 
 
@@ -80,5 +76,5 @@ typedef struct parse_env
 }parse_env;
 
 parse_env* parser_new_env();
-int parse(parse_env* env);
+int parser_pase(parse_env* env);
 #endif

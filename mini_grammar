@@ -1,0 +1,599 @@
+#void cat_token(parse_rule *r, token **tokens,int n);
+
+# token process routine
+
+# r 
+# on entry, r points to whtf, i don't need this
+
+# token **tokens
+#   On entry, tokens is a vector of length n (3rd para) that stores 
+# pointers to tokens.
+#   On leave, token[0]->data field should contain the data you wanna
+# to store in the out put token
+# In token process routine, you needn't (shouldn't) to free tokens
+# which are free by the program, but keep in mind that you need to
+# manage the token->data field to prevent memory leak.
+
+# int n
+# On entry, n is the length of tokens vector. Usually n is the length of the rule.
+
+###################################################################
+
+# parser_identifier is a builtin type
+# get   token   id                          value
+#           0   TOKNE_parser_identifier     char* points to string of the identifier
+# custom out
+#           0   TOKEN_expr                  AST* points to an identifier node of AST
+expr : parser_identifier {
+    token *tok = *tokens;
+    AST * node = AST_new_node(identifier);
+
+    node->data.identifier_data.name = tok->data;
+    tok->data = node;
+};
+
+# parser_number is a builtin type
+# get   token   id                          value
+#           0   TOKNE_parser_number         char* points to string of the number
+# custom out
+#           0   TOKEN_expr                  AST* points to an number node of AST
+expr : parser_number {
+    token *tok = *tokens;
+    AST * node = AST_new_node(number);
+
+    node->data.number_data.number = tok->data;
+    tok->data = node;
+};
+
+# parser_number is a builtin type
+# get   token   id                          value
+#           0   TOKNE_parser_string         char* points to string of the number
+# custom out
+#           0   TOKEN_expr                  AST* points to an number node of AST
+expr : parser_string {
+    token *tok = *tokens;
+    AST * node = AST_new_node(string);
+
+    node->data.string_data.str = tok->data;
+    tok->data = node;
+}; 
+
+# biary ops
+
+expr : expr < 1 ',' expr {
+    AST *op1 = tokens[0]->data;
+    char* op = tokens[1]->data;
+    AST *op2 = tokens[2]->data;
+
+    AST *node = AST_new_node(biary);
+    node->data.biary_data.op1 = op1;
+    node->data.biary_data.op = op;
+    node->data.biary_data.op2 = op2;
+
+    tokens[0]->data = node;
+};
+
+# @ -- use routine just above it
+
+expr : expr > 2 '=' expr   @;
+expr : expr > 2 "+=" expr  @;
+expr : expr > 2 "-=" expr  @;
+expr : expr > 2 "*=" expr  @;
+expr : expr > 2 "/=" expr  @;
+expr : expr > 2 "%=" expr  @;
+expr : expr > 2 "&=" expr  @;
+expr : expr > 2 "^=" expr  @;
+expr : expr > 2 "|=" expr  @;
+expr : expr > 2 ">>=" expr @;
+expr : expr > 2 "<<=" expr @;
+
+expr : expr < 4 "||" expr  @;
+
+expr : expr < 5 "&&" expr  @;
+
+expr : expr < 6 "|" expr   @;
+expr : expr < 7 "^" expr   @;
+expr : expr < 8 "&" expr   @;
+
+expr : expr < 9 "==" expr  @;
+expr : expr < 9 "!=" expr  @;
+
+expr : expr < 10 '<' expr  @;
+expr : expr < 10 "<=" expr @;
+expr : expr < 10 '>' expr  @;
+expr : expr < 10 ">=" expr @;
+
+expr : expr < 11 ">>" expr @;
+expr : expr < 11 "<<" expr @;
+
+expr : expr < 12 '+' expr  @;
+expr : expr < 12 '-' expr  @;
+
+expr : expr < 13 '*' expr  @;
+expr : expr < 13 '/' expr  @;
+expr : expr < 13 '%' expr  @;
+
+expr : expr < 15 "->" expr @;
+expr : expr < 15 "." expr  @;
+
+expr : > 14 '!' expr {
+    token *tok_out = tokens[0];
+    AST *node = AST_new_node(unary);
+
+    node->data.unary_data.op = tokens[0]->data;
+    node->data.unary_data.op1 = tokens[1]->data;
+    node->data.unary_data.flag = 0;
+
+    tok_out->data = node;
+};
+
+expr : > 14 '~' expr   @;
+expr : > 14 '-' expr   @;
+expr : > 14 '&' expr   @;
+
+expr : > 14 '*'  expr  @;
+expr : > 14 "--"  expr @;
+expr : > 14 "++"  expr @;
+
+expr : expr < 15 "++" {
+    token *tok_out = tokens[0];
+    AST *node = AST_new_node(unary);
+
+    node->data.unary_data.op = tokens[1]->data;
+    node->data.unary_data.op1 = tokens[0]->data;
+    node->data.unary_data.flag = 1;
+
+    tok_out->data = node;
+};
+expr : expr < 15 "--" @;
+
+expr_sq : '[' expr ']' {
+    token *tok_out = tokens[0];
+    AST *node = AST_new_node(expr_sqr);
+
+    free(tokens[0]->data);
+    node->data.expr_sqr_data.expr = tokens[1]->data;
+    free(tokens[2]->data);
+
+    tok_out->data = node;
+};
+
+expr : expr expr_sq {
+    token *tok_out = tokens[0];
+    AST *node = AST_new_node(expr_sqr);
+
+    node->data.addr_loc_data.addr = tokens[0]->data;
+    node->data.addr_loc_data.offset = tokens[1]->data;
+
+    tok_out->data = node;
+};
+
+expr_brace : '(' ?expr ')' {
+    token *tok_out = tokens[0];
+    AST *node = AST_new_node(expr_brace);
+    if (n == 3){
+        free(tokens[0]->data);
+        node->data.expr_sqr_data.expr = tokens[1]->data;
+        free(tokens[2]->data);
+    } else if ( n == 2){
+        free(tokens[0]->data);
+        free(tokens[1]->data);
+        node->data.expr_sqr_data.expr = NULL;
+    }
+    tok_out->data = node;
+};
+
+expr : expr_brace {
+    token *tok_out = tokens[0];
+    if(((AST*)tokens[0]->data)->data.expr_sqr_data.expr == NULL)
+        exit(-1); // TODO:
+    else{
+        AST *old = tokens[0]->data;
+        tokens[0]->data = ((AST*)tokens[0]->data)->data.expr_sqr_data.expr;
+        free(old);
+    }
+};
+expr : expr expr_brace {
+    token *tok_out = tokens[0];
+    AST *node = AST_new_node(func_call);
+
+    AST *func = tokens[0]->data;
+    node->data.func_call_data.func = func;
+
+    if(((AST*)tokens[1]->data)->data.expr_sqr_data.expr == NULL){
+        // empty para
+        node->data.func_call_data.para = NULL;
+        node->data.func_call_data.n = 0;
+    } else {
+        int cnt = 0, max = 8;
+        AST *expr = ((AST*)tokens[1]->data)->data.expr_sqr_data.expr;
+        AST **paras = (AST**)malloc(sizeof(AST*)*max);
+        AST *tmp;
+
+        while(expr->type == biary && expr->data.biary_data.op[0] == ','){
+            paras[cnt++] = expr->data.biary_data.op2;
+            if(cnt >= max){
+                paras = (AST**)realloc(paras,sizeof(AST*)*max*2);
+                max *= 2;
+            }
+            tmp = expr;
+            expr = expr->data.biary_data.op1;
+            free(tmp);
+        }
+
+        //reverse paras ,since ',' is left-assosiative
+        for(int i=0;i<cnt/2;i++){
+            tmp = paras[cnt - i];
+            paras[cnt -i] = paras[i];
+            paras[i] = tmp;
+        }
+        node->data.func_call_data.para = paras;
+        node->data.func_call_data.n = cnt;
+    }
+    tok_out->data = node;
+};
+
+statement : ?expr ';' {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(statement_expr);
+
+    if (n == 1){
+        node->data.statement_expr_data.expr = NULL;
+        free(tokens[1]->data);
+    } else if (n == 2){
+        node->data.statement_expr_data.expr = tokens[0]->data;
+        free(tokens[1]->data);
+    }
+    tok_out->data = node;
+} ;
+
+statement : '{' *statement '}' {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(statement_block);
+
+    free(tokens[0]->data);
+    free(tokens[n-1]->data);
+
+    int cnt = n - 2;
+    AST **statements;
+    if(n > 0){
+        statements = (AST**)malloc(sizeof(AST*)*cnt);
+        for(int i=0;i<cnt;i++){
+            statements[i] = tokens[i+1]->data;
+        }
+    } else {
+        statements = NULL;
+    }   
+
+    node->data.statement_block_data.statements = statements;
+    node->data.statement_block_data.n = cnt;
+
+    tok_out->data = node;
+};
+
+statement : "if" expr_brace statement {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(statement_if);
+
+    free(tokens[0]->data);
+    node->data.statement_if_data.condiction = ((AST*)tokens[1]->data)->data.expr_brace_data.expr;
+    node->data.statement_if_data.statement_success = tokens[2]->data;
+    node->data.statement_if_data.statement_fail = NULL;
+
+    tok_out->data = node;
+};
+
+statement : "if" expr_brace statement "else" statement {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(statement_if);
+
+    free(tokens[0]->data);
+    node->data.statement_if_data.condiction = ((AST*)tokens[1]->data)->data.expr_brace_data.expr;
+    node->data.statement_if_data.statement_success = tokens[2]->data;
+    free(tokens[3]->data);
+    node->data.statement_if_data.statement_fail = tokens[4]->data;
+
+    tok_out->data = node;
+};
+
+statement : "while" expr_brace statement {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(statement_while);
+
+    free(tokens[0]->data);
+    node->data.statement_while_data.condiction = ((AST*)tokens[1]->data)->data.expr_brace_data.expr;
+    node->data.statement_while_data.loop = tokens[2]->data;
+
+    tok_out->data = node;
+};
+
+statement : "while" expr_brace ';' {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(statement_while);
+
+    free(tokens[0]->data);
+    node->data.statement_while_data.condiction = ((AST*)tokens[1]->data)->data.expr_brace_data.expr;
+    node->data.statement_while_data.loop = NULL;
+    free(tokens[2]->data);
+
+    tok_out->data = node;
+};
+
+statement : "do" statement "while" expr_brace ';' {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(statement_do_while);
+
+    free(tokens[0]->data);
+    node->data.statement_do_while_data.action = tokens[1]->data;
+    free(tokens[2]->data);
+    node->data.statement_do_while_data.condiction = ((AST*)tokens[3]->data)->data.expr_brace_data.expr;
+    free(tokens[4]->data);
+
+    tok_out->data = node;
+};
+
+for_brace : '(' statement statement ?expr ')' {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(statement_for);
+
+    free(tokens[0]->data);
+    node->data.statement_for_data.init = tokens[1]->data;
+    node->data.statement_for_data.cond = tokens[2]->data;
+    if(n == 5){
+        node->data.statement_for_data.update = tokens[3]->data;
+        free(tokens[4]->data);
+    } else if ( n == 4){
+        node->data.statement_for_data.update = NULL;
+        free(tokens[3]->data);
+    }
+
+    tok_out->data = node;
+};
+
+statement : "for"  for_brace statement {
+    token* tok_out = tokens[0];
+    AST *node = tokens[1]->data;
+
+    free(tokens[0]->data);
+    node->data.statement_for_data.loop = tokens[2]->data;
+
+    tok_out->data = node;
+};
+
+type_decorator : "auto" {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(type_dec);
+
+    free(tokens[0]->data);
+    node->data.type_dec_data.flag = TYPE_DEC_AUTO;
+
+    tok_out->data = node;
+};
+
+type_decorator : "register"{
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(type_dec);
+
+    free(tokens[0]->data);
+    node->data.type_dec_data.flag = TYPE_DEC_REGISTER;
+
+    tok_out->data = node;
+};
+
+type_decorator : "volatile"{
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(type_dec);
+
+    free(tokens[0]->data);
+    node->data.type_dec_data.flag = TYPE_DEC_VOLATILE;
+
+    tok_out->data = node;
+};
+
+type_decorator : "const"{
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(type_dec);
+
+    free(tokens[0]->data);
+    node->data.type_dec_data.flag = TYPE_DEC_CONST;
+
+    tok_out->data = node;
+};
+
+type_decorator : "static"{
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(type_dec);
+
+    free(tokens[0]->data);
+    node->data.type_dec_data.flag = TYPE_DEC_STATIC;
+
+    tok_out->data = node;
+};
+
+type_decorator : "extern"{
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(type_dec);
+
+    free(tokens[0]->data);
+    node->data.type_dec_data.flag = TYPE_DEC_EXTERN;
+
+    tok_out->data = node;
+};
+
+typename : "char" {
+    TYPENAME_PROCESS1(TYPENAME_CHAR);
+};
+
+typename : "unsigned" "char" {
+    TYPENAME_PROCESS2(TYPENAME_UCHAR);
+};
+
+typename : "short" {
+    TYPENAME_PROCESS1(TYPENAME_SHORT);
+};
+
+typename : "unsigned" "short" {
+    TYPENAME_PROCESS2(TYPENAME_UCHAR);
+};
+
+typename : "unsigned" {
+    TYPENAME_PROCESS1(TYPENAME_UNSIGNED);
+};
+
+typename : "int" {
+    TYPENAME_PROCESS1(TYPENAME_INT);
+};
+
+typename : "unsigned" "int" {
+    TYPENAME_PROCESS2(TYPENAME_UINT);
+};
+
+typename : "long" {
+    TYPENAME_PROCESS1(TYPENAME_LONG);
+};
+
+typename : "unsigned" "long" {
+    TYPENAME_PROCESS2(TYPENAME_ULONG);
+};
+
+typename : "long" "long" {
+    TYPENAME_PROCESS2(TYPENAME_LLONG);
+};
+
+typename : "unsigned" "long" "long" {
+    TYPENAME_PROCESS3(TYPENAME_ULLONG);
+};
+
+typename : "float" {
+    TYPENAME_PROCESS1(TYPENAME_FLOAT);
+};
+
+typename : "double" {
+    TYPENAME_PROCESS1(TYPENAME_DOUBLE);
+};
+
+typename : "long" "double" {
+    TYPENAME_PROCESS2(TYPENAME_LDOUBLE);
+};
+
+typename : "void" {
+    TYPENAME_PROCESS1(TYPENAME_VOID);
+};
+
+variable_declare : *type_decorator < typename expr {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(variable_decare);
+
+    unsigned flag = 0;
+    int i;
+    for(i=0;i<n;i++){
+        AST* n = tokens[i]->data;
+        if(n->type != type_dec)
+            break;
+        //if(flag & n->data.type_dec_data.flag)
+            // TODO: conflict;
+        flag |= n->data.type_dec_data.flag;
+        free(n);
+    }
+    node->data.variable_decare_data.flag = flag;
+    
+    node->data.variable_decare_data.type_id = ((AST*)tokens[i]->data)->data.type_data.idx;
+    free(tokens[i]->data);
+    node->data.variable_decare_data.expr = tokens[i+1]->data;
+
+    tok_out->data = node;
+};
+
+statement : variable_declare ';' {
+    free(tokens[1]->data);
+};
+
+type_braced : '(' *variable_declare ')' {
+    token* tok_out = tokens[0];
+    AST *node = AST_new_node(type_braced);
+
+    free(tokens[1]->data);
+    free(tokens[n-1]->data);
+
+    AST **para;
+    int cnt;
+    if(n == 2){
+        para = NULL;
+        cnt = 0;
+    } else {
+        int max = 8;
+        para = (AST**)malloc(sizeof(AST*)*max);
+        for(int i=1;i<n-1;i++){
+            AST* n = tokens[i]->data;
+            if(n->type != type_dec)
+                break;
+            para[cnt++] = n;
+            if(cnt >= max){
+                para = (AST**)realloc(para,sizeof(AST*)*max*2);
+                max *= 2;
+            }
+        }
+    }
+    node->data.func_data.para = para;
+    node->data.func_data.n = cnt;
+
+    tok_out->data = node;
+};
+
+func_declare : variable_declare type_braced ';' {
+    token* tok_out = tokens[0];
+    AST *node = tokens[1]->data;
+
+    free(tokens[2]->data);
+
+    node->type = func_declare;
+    node->data.func_data.statement = NULL;
+    node->data.func_data.return_type = tokens[0]->data;
+
+    tok_out->data = node;
+};
+
+func_define : variable_declare type_braced statement {
+    token* tok_out = tokens[0];
+    AST *node = tokens[1]->data;
+
+    node->type = func_define;
+    node->data.func_data.return_type = tokens[0]->data;
+    node->data.func_data.statement = tokens[2]->data;
+
+    tok_out->data = node;
+};
+
+statement : "return" statement{
+    token *tok_out = tokens[0];
+    AST *node = AST_new_node(statement_return);
+
+    free(tokens[0]->data);
+
+    node->data.statement_return_data.expr = tokens[1]->data;
+
+    tok_out->data = node;
+};
+
+statement : "continue" ';' {
+    token *tok_out = tokens[0];
+    AST *node = AST_new_node(statement_continue);
+
+    free(tokens[0]->data);
+    free(tokens[1]->data);
+
+    tok_out->data = node;
+};
+
+statement : "break" ';' {
+    token *tok_out = tokens[0];
+    AST *node = AST_new_node(statement_break);
+
+    free(tokens[0]->data);
+    free(tokens[1]->data);
+
+    tok_out->data = node;
+};
+
+statement : dddd ;
+statement : eee ;

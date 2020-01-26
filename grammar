@@ -1,8 +1,39 @@
-expr : parser_identifier;
-expr : parser_number; 
-expr : parser_string; 
+# token *cat_token(parse_rule *r, token **tokens,int n);
 
-expr : expr < 1 ',' expr;
+# token process routine
+
+# r 
+# on entry, r points to whtf, i don't need this
+
+# token **tokens
+#   On entry, tokens is a vector of length n (3rd para) that stores 
+# pointers to tokens.
+#   On leave, token[0]->data field should contain the data you wanna
+# to store in the out put token
+# In token process routine, you needn't (shouldn't) to free tokens
+# which are free by the program, but keep in mind that you need to
+# manage the token->data field to prevent memory leak.
+
+# int n
+# On entry, n is the length of tokens vector. Usually n is the length of the rule.
+
+# parser_identifier is the builtin type
+# get   token   id                          value
+#           0   TOKNE_parser_identifier     char* points to string of the identifier
+# costom out
+#           0   TOKEN_expr                  ASL* points to an identifier node of ASL
+expr : parser_identifier ;#{
+#     token *tok = *tokens;
+#     ASL * n = ASL_new_node(identifier);
+#     n->data.str = tok->data;
+#     free()
+# };
+expr : parser_number; 
+
+
+expr : expr < 1 ',' expr {
+
+};
 
 expr : expr > 2 '=' expr;
 expr : expr > 2 "+=" expr;
@@ -63,11 +94,10 @@ expr : expr < 15 "." expr;
 expr_sq : '[' expr ']';
 expr : expr expr_sq;
 
-expr_brace : '(' *expr ')';
+expr_brace : '(' ?expr ')';
 expr : expr_brace;
 expr : expr expr_brace;
 
-# actuall ? here
 statement : ?expr ';';
 
 statement : '{' *statement '}';
@@ -80,7 +110,7 @@ statement : "while" expr_brace ';';
 
 statement : "do" statement "while" expr_brace ';';
 
-
+# this is fake
 for_brace : '(' statement statement ?expr ')';
 statement : "for"  for_brace statement;
 
@@ -128,7 +158,10 @@ type_braced : '(' *variable_declare ')';
 func_declare : variable_declare type_braced ';';
 
 func_define : variable_declare type_braced statement ;
+
 statement : "return" statement;
+statement : "continue" ';';
+statement : "break" ';';
 
 # func_define declare without ','
 # no variable_declare in for

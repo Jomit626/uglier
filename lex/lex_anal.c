@@ -9,9 +9,7 @@
 #define is_vaild_identifier_start(x) (((x) >= 'a'&&(x)<='z')||((x) >= 'A'&&(x)<='Z')||(x)=='_')
 #define is_identifier(x) (is_vaild_identifier_start(x)||is_num(x))
 
-
 //special words
-
 typedef enum hardcored_state{
     spec_word,
     init,

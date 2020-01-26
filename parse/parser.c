@@ -23,10 +23,10 @@ static token* tokens_pop(parse_env *env);
 
 void go(parse_env *env, parse_edge *e)
 {
-    msg("goto %d\n", e->tail);
+    msg("goto %d\n", e->head);
     env->runtime->pre_edge = e;
     env->runtime->length++;
-    env->runtime->cur_state = &env->states[e->tail];
+    env->runtime->cur_state = &env->states[e->head];
 }
 
 void shift(parse_env *env, int x, parse_edge* pre_edge, int length)
@@ -53,17 +53,15 @@ void reduce(parse_env *env, int rule_idx)
         env->runtime->cur_state = &env->states[STATUS_START];
         env->runtime->length = 0;
     }
-    token *t;
-    if (r->func)
-    {
-        t = r->func(r, &env->token_stack[env->token_top - length + 1],length); // TODO: wtf
-    }
-    else
-    {
-        t = new_token(r->out_token, NULL,NULL);
-    }
+    token** tokens = &env->token_stack[env->token_top - length + 1];
     env->token_top -= length;
-    tokens_push_front(env,t);
+    if (r->func)
+        r->func(r, tokens,length);
+    for(int i=1;i<length;i++){
+        free(tokens[i]);
+    }
+    tokens[0]->id = r->out_token;
+    tokens_push_front(env,tokens[0]);
 }
 
 parse_env *parser_new_env()
@@ -165,7 +163,7 @@ int look_ahead(parse_env *env)
         return 1;
 }
 
-int parse(parse_env *env)
+int parser_pase(parse_env *env)
 {
     env->runtime->cur_state = &env->states[STATUS_START];
     while ((get_token(env) || !tokens_empty(env)) && env->runtime->cur_state != env->states)
@@ -178,8 +176,7 @@ int parse(parse_env *env)
 }
 inline static parse_edge* find_edge(parse_env *env, parse_state *state, token* tok){
     int e = state->first_edge;
-    for (; e > 0 && env->edges[e].token != tok->id; e = env->edges[e].next)
-        ;
+    for (; e > 0 && env->edges[e].token != tok->id; e = env->edges[e].next);
     if (e > 0)
         return &env->edges[e];
     else 
@@ -191,8 +188,8 @@ int dfs(parse_env *env,parse_state* state, int tok){
         return 1;
     int e = state->first_edge;
     int found = 0;
-    for (; e > 0 && env->edges[e].tail != env->edges[e].head; e = env->edges[e].next){
-        found = dfs(env,&env->states[env->edges[e].tail],tok);
+    for (; e > 0 && env->edges[e].head != env->edges[e].tail; e = env->edges[e].next){
+        found = dfs(env,&env->states[env->edges[e].head],tok);
         if(found)
             break;
     }
@@ -204,7 +201,7 @@ parse_edge* rescursion(parse_env *env, token* tok1, token *tok2){
     parse_edge *edge = find_edge(env,state, tok1);
 
     if(edge){
-        state = &env->states[edge->tail];
+        state = &env->states[edge->head];
         edge = find_edge(env,state,tok2);
     }
     if(dfs(env,state,tok1->id))
@@ -219,15 +216,10 @@ void parser_fit(parse_env *env)
     parse_state *cur_state = env->runtime->cur_state;
     parse_edge *e1,*e2,*pre_edge = env->runtime->pre_edge;
     token* tok = tokens_front(env);
-
     msg("%d:get token %d:%s\n", env->runtime->cur_state - env->states, tok->id, (char *)tok->data);
-
     e1 = find_edge(env,cur_state,tok);
     if (e1)
     {
-        
-        parse_state *nxt_state = &env->states[e1->tail];
-
         if(look_ahead(env)){
             token * nxt_tok = tok->next;
             if(pre_edge && (e2 = rescursion(env,tok,nxt_tok))){
@@ -243,7 +235,7 @@ void parser_fit(parse_env *env)
                         tokens_pop(env);
                         TOKENS_PUSH(tok);
                         TOKENS_PUSH(nxt_tok);
-                        shift(env,e2->tail,e2,2);
+                        shift(env,e2->head,e2,2);
                     }
                 } else if (pre_edge->p > e2->p){
                     tokens_pop(env);
@@ -254,7 +246,7 @@ void parser_fit(parse_env *env)
                     tokens_pop(env);
                     TOKENS_PUSH(tok);
                     TOKENS_PUSH(nxt_tok);
-                    shift(env,e2->tail,e2,2);
+                    shift(env,e2->head,e2,2);
                 }
             } else {
                 tokens_pop(env);
